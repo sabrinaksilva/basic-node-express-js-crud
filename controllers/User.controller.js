@@ -32,10 +32,12 @@ exports.create = (req, res) => {
 
 
 
-exports.findAll = async (request, response) => {
+exports.findAll = async (request, response, next) => {
     const {
         query: { filter, filterValue, page, size },
     } = request;
+
+
 
     const pageNumber = parseInt(page || 1)
     const limit = parseInt(size || 5);
@@ -43,15 +45,13 @@ exports.findAll = async (request, response) => {
 
     const endIndex = page * limit;
 
-    console.log(filter)
-    console.log(filterValue)
+
 
     let idFilter = (filter && filterValue && (filter == "id")) ? filterValue : undefined
     let usernameFilter = (filter && filterValue && (filter == "username")) ? filterValue : undefined
 
     const where = {
-        offset: startIndex,
-        limit: limit
+
     }
     where[db.op.and] = []
 
@@ -70,40 +70,57 @@ exports.findAll = async (request, response) => {
     }
 
 
-    const result = {
-        page: pageNumber,
-        size: limit,
-        totalElements: 0
-    };
+    // Calcula o total de páginas
 
-    if (endIndex < totalCount) {
-        result.next = {
-            page: page + 1,
-            limit: limit,
+
+    // if (endIndex < totalElements) {
+    //     result.next = {
+    //         page: page + 1,
+    //         limit: limit,
+    //     };
+    // }
+    // if (startIndex > 0) {
+    //     result.previous = {
+    //         page: page - 1,
+    //         limit: limit,
+    //     };
+    // }
+
+
+    // await User.findAll({ where }).limit(limit).skip(startIndex)
+    //     .then(usersList => {
+    //         result.content = usersList.map(userMapper.modelToDTO)
+    //         result.size = result.content.size()
+    //         return response
+    //             .status(200)
+    //             .send(result)
+    //     })
+    //     .catch(e => {
+    //         console.log(e);
+    //         const error = new Error("Unexpected error to find users");
+    //         next(error)
+    //     });
+
+
+    try {
+        const totalCount = await User.count({ where });
+        const usersList = await User.findAll({ where, limit: 5, startIndex });
+        let totalPages = Math.ceil(totalCount / limit);
+
+        const result = {
+            content: usersList.map(userMapper.modelToDTO),
+            size: usersList.length,
+            totalElements: totalCount,
+            totalPages: totalPages,
+            page: pageNumber,
+            limit: limit
         };
+
+        return response.status(200).send(result);
+    } catch (error) {
+        console.log(error);
+        const err = new Error("Unexpected error while finding users");
+        next(err);
     }
-    if (startIndex > 0) {
-        result.previous = {
-            page: page - 1,
-            limit: limit,
-        };
-    }
-
-
-    await User.findAll({ where }).limit(limit).skip(startIndex)
-        .then(usersList => {
-            result.content = usersList.map(userMapper.modelToDTO)
-            result.
-            return response
-                .status(200)
-                .send(result)
-        })
-        .catch(e => {
-            console.log(e);
-            const error = new Error("Unexpected error to find users");
-            next(error)
-        });
-
-
 
 };
